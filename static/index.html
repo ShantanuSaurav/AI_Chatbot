@@ -83,14 +83,19 @@
             <!-- Left Pane: PDF Viewer -->
             <section class="pane left-pane" id="pdfPane">
                 <header class="pane-header">
-                    <div class="header-doc-info">
-                        <button id="toggleSidebarBtn" class="btn-icon" title="Toggle Sidebar">
-                            <i data-lucide="menu"></i>
-                        </button>
-                        <div class="doc-meta-title">
-                            <h2 id="activeDocTitle">Select a Document</h2>
-                            <span class="panel-subtitle">Interactive PDF Reader</span>
+                    <div class="header-doc-info" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                        <div style="display: flex; align-items: center; gap: 16px; min-width: 0;">
+                            <button id="toggleSidebarBtn" class="btn-icon" title="Toggle Sidebar">
+                                <i data-lucide="menu"></i>
+                            </button>
+                            <div class="doc-meta-title" style="min-width: 0;">
+                                <h2 id="activeDocTitle">Select a Document</h2>
+                                <span class="panel-subtitle">Interactive PDF Reader</span>
+                            </div>
                         </div>
+                        <a id="openNewTabBtn" class="btn-icon" target="_blank" title="Open PDF in New Tab" style="display: none; text-decoration: none; color: var(--text-secondary);">
+                            <i data-lucide="external-link"></i>
+                        </a>
                     </div>
                 </header>
 
