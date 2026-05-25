@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Copilot - AI RAG Document Chatbot</title>
+    <!-- Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- KaTeX for beautiful publication-quality math rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+    
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <!-- Background Glows -->
+    <div className="background-glows">
+        <div class="glow glow-1"></div>
+        <div class="glow glow-2"></div>
+    </div>
+
+    <div class="app-container">
+        <!-- Sidebar: Library & Uploads -->
+        <aside class="sidebar" id="sidebar">
+            <!-- Sidebar Header -->
+            <div class="sidebar-header">
+                <div class="logo-area">
+                    <div class="logo-icon">
+                        <i data-lucide="file-text"></i>
+                    </div>
+                    <div>
+                        <h1>PDF Copilot</h1>
+                        <p>Intelligent RAG Reader</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Upload Area -->
+            <div class="sidebar-section">
+                <h2>Upload PDF</h2>
+                <form id="uploadForm" class="upload-form">
+                    <div class="drop-zone" id="dropZone">
+                        <div class="drop-icon">
+                            <i data-lucide="upload-cloud"></i>
+                        </div>
+                        <span class="drop-title">Drag & drop PDF here</span>
+                        <span class="drop-subtitle">or click to browse</span>
+                        <input type="file" id="fileInput" accept=".pdf" multiple style="display: none;">
+                    </div>
+                    
+                    <!-- Selected Files Preview -->
+                    <div id="filePreviewList" class="file-preview-list"></div>
+
+                    <button type="submit" id="uploadBtn" class="btn btn-primary" disabled>
+                        <i data-lucide="plus"></i>
+                        <span>Upload Files</span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Document List Catalog -->
+            <div class="sidebar-section flex-grow">
+                <div class="section-title-bar">
+                    <h2>Your Document Library</h2>
+                    <span id="docCountBadge" class="badge">0</span>
+                </div>
+                <div id="docList" class="doc-list custom-scrollbar">
+                    <div class="empty-state">
+                        <i data-lucide="folder-open"></i>
+                        <p>No documents uploaded yet.</p>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Workspace Split Grid -->
+        <main class="main-workspace">
+            
+            <!-- Left Pane: PDF Viewer -->
+            <section class="pane left-pane" id="pdfPane">
+                <header class="pane-header">
+                    <div class="header-doc-info">
+                        <button id="toggleSidebarBtn" class="btn-icon" title="Toggle Sidebar">
+                            <i data-lucide="menu"></i>
+                        </button>
+                        <div class="doc-meta-title">
+                            <h2 id="activeDocTitle">Select a Document</h2>
+                            <span class="panel-subtitle">Interactive PDF Reader</span>
+                        </div>
+                    </div>
+                </header>
+
+                <div class="pdf-container" id="pdfContainer">
+                    <div class="welcome-card" id="pdfWelcome">
+                        <div class="welcome-icon animate-pulse">
+                            <i data-lucide="sparkles"></i>
+                        </div>
+                        <h3>Global Query Mode Active</h3>
+                        <p>You are currently questioning across <strong>all uploaded documents</strong>. Select any PDF in the sidebar to open the interactive side-by-side reader.</p>
+                    </div>
+                    <iframe id="pdfIframe" class="pdf-iframe" style="display: none;"></iframe>
+                </div>
+            </section>
+
+            <!-- Right Pane: AI Chatbot -->
+            <section class="pane right-pane" id="chatPane">
+                <header class="pane-header">
+                    <div class="pane-header-title">
+                        <i data-lucide="bot" class="text-indigo"></i>
+                        <div>
+                            <h2>AI Chat Assistant</h2>
+                            <span id="chatScopeBadge" class="panel-subtitle">Global Scope</span>
+                        </div>
+                    </div>
+                </header>
+
+                <!-- Chat Messages Logs -->
+                <div id="chatLog" class="chat-log custom-scrollbar">
+                    <div class="chat-welcome">
+                        <div class="bot-bubble-icon">
+                            <i data-lucide="bot"></i>
+                        </div>
+                        <h3>How can I help you today?</h3>
+                        <p>Ask a question about your document library. I will retrieve relevant paragraphs and explain details instantly.</p>
+                    </div>
+                </div>
+
+                <!-- Chat Input Footer -->
+                <div class="chat-footer">
+                    <form id="chatForm" class="chat-form">
+                        <input type="text" id="chatInput" placeholder="Search and ask across all documents..." required>
+                        <button type="submit" id="sendBtn" class="send-btn" disabled>
+                            <i data-lucide="send"></i>
+                        </button>
+                    </form>
+                    <div class="footer-notice">
+                        PDF Copilot is powered by local HuggingFace embeddings & Google Gemini.
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Script Entrypoint -->
+    <script src="/static/app.js"></script>
+</body>
+</html>
