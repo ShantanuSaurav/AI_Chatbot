@@ -1,4 +1,13 @@
 // State Management
+const sessionId = (() => {
+    let sid = sessionStorage.getItem('sessionId');
+    if (!sid) {
+        sid = 'session_' + Math.random().toString(36).substring(2, 15) + '_' + Date.now();
+        sessionStorage.setItem('sessionId', sid);
+    }
+    return sid;
+})();
+
 let selectedFiles = [];
 let activeDocId = null;
 let documentsList = [];
@@ -31,6 +40,11 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
     updateUploadButtonState();
     resetWorkspace(); // Load global chat history on startup
+
+    // Bind pagehide window close cleanup beacon
+    window.addEventListener('pagehide', () => {
+        navigator.sendBeacon(`/api/session/clear?q_session_id=${sessionId}`);
+    });
 });
 
 // Setup Event Handlers
@@ -162,6 +176,7 @@ async function handleUploadSubmit(e) {
     try {
         const res = await fetch('/api/upload', {
             method: 'POST',
+            headers: { 'Session-ID': sessionId },
             body: formData
         });
 
@@ -187,7 +202,9 @@ async function handleUploadSubmit(e) {
 // Fetch Document List from API
 async function fetchDocuments() {
     try {
-        const res = await fetch('/api/documents');
+        const res = await fetch('/api/documents', {
+            headers: { 'Session-ID': sessionId }
+        });
         if (!res.ok) throw new Error('Failed to load documents');
         
         documentsList = await res.json();
@@ -276,7 +293,10 @@ function toggleDeleteConfirm(e, docId) {
 async function confirmDelete(e, docId) {
     e.stopPropagation();
     try {
-        const res = await fetch(`/api/documents/${docId}`, { method: 'DELETE' });
+        const res = await fetch(`/api/documents/${docId}`, { 
+            method: 'DELETE',
+            headers: { 'Session-ID': sessionId }
+        });
         if (!res.ok) throw new Error('Deletion failed');
         
         deletingDocId = null;
@@ -285,6 +305,9 @@ async function confirmDelete(e, docId) {
             resetWorkspace();
         }
         await fetchDocuments();
+        
+        // Remove locally stored chat history for deleted document
+        localStorage.removeItem(`chat_history_${docId}`);
     } catch (err) {
         console.error(err);
         alert('Delete failed: ' + err.message);
@@ -305,10 +328,10 @@ function setActiveDocument(docId) {
     activeDocTitle.innerText = activeDoc.filename;
     chatScopeBadge.innerText = "Specific Document scope";
 
-    // Set side-by-side iframe source
+    // Set side-by-side iframe source (pass session id in query param for GET request verification)
     pdfWelcome.style.display = 'none';
     pdfIframe.style.display = 'block';
-    pdfIframe.src = `/api/documents/${docId}/file`;
+    pdfIframe.src = `/api/documents/${docId}/file?q_session_id=${sessionId}`;
 
     // Clear chat logs and load historical conversation
     clearChatLog();
@@ -329,14 +352,12 @@ function clearChatLog() {
     chatLog.innerHTML = '';
 }
 
-// Load Chat History from Endpoint
-async function loadChatHistory() {
+// Load Chat History from Local Storage (Scoped by active context)
+function loadChatHistory() {
     try {
-        const endpoint = activeDocId ? `/api/chat/history?doc_id=${activeDocId}` : '/api/chat/history';
-        const res = await fetch(endpoint);
-        if (!res.ok) throw new Error('Failed to load chat history');
-        
-        const history = await res.json();
+        const storageKey = activeDocId ? `chat_history_${activeDocId}` : 'chat_history_global';
+        const historyData = localStorage.getItem(storageKey);
+        const history = historyData ? JSON.parse(historyData) : [];
         
         if (history.length === 0) {
             renderChatWelcome();
@@ -349,7 +370,8 @@ async function loadChatHistory() {
         
         scrollChatToBottom();
     } catch (err) {
-        console.error(err);
+        console.error('Error loading chat history from local storage:', err);
+        renderChatWelcome();
     }
 }
 
@@ -442,6 +464,9 @@ async function handleChatSubmit(e) {
     appendMessageBubble('user', query);
     scrollChatToBottom();
 
+    // Save user message in local history
+    saveToLocalHistory('user', query);
+
     // Setup Typing indicator
     const loaderRow = document.createElement('div');
     loaderRow.className = 'msg-row ai animate-pulse';
@@ -463,12 +488,18 @@ async function handleChatSubmit(e) {
     scrollChatToBottom();
 
     try {
-        const payload = { message: query };
+        const payload = { 
+            message: query,
+            chat_history: getRecentChatHistoryForAPI()
+        };
         if (activeDocId) payload.doc_id = activeDocId;
 
         const res = await fetch('/api/chat', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'Session-ID': sessionId
+            },
             body: JSON.stringify(payload)
         });
 
@@ -480,6 +511,10 @@ async function handleChatSubmit(e) {
         if (loader) loader.remove();
 
         appendMessageBubble('ai', reply.answer, reply.sources);
+        
+        // Save AI message in local history
+        saveToLocalHistory('ai', reply.answer, reply.sources);
+        
         scrollChatToBottom();
     } catch (err) {
         console.error(err);
@@ -566,4 +601,44 @@ function parseSimpleMarkdown(text) {
     });
 
     return result;
+}
+
+// Local Chat History Helpers (Ensures 100% server privacy, scoped by context)
+function saveToLocalHistory(role, content, sources = null) {
+    try {
+        const storageKey = activeDocId ? `chat_history_${activeDocId}` : 'chat_history_global';
+        const historyData = localStorage.getItem(storageKey);
+        const history = historyData ? JSON.parse(historyData) : [];
+        
+        history.push({
+            role,
+            content,
+            sources,
+            timestamp: new Date().toISOString()
+        });
+        
+        // Retain only last 50 entries to maintain crisp local storage sizes
+        if (history.length > 50) {
+            history.shift();
+        }
+        
+        localStorage.setItem(storageKey, JSON.stringify(history));
+    } catch (err) {
+        console.error('Error saving chat history locally:', err);
+    }
+}
+
+function getRecentChatHistoryForAPI() {
+    try {
+        const storageKey = activeDocId ? `chat_history_${activeDocId}` : 'chat_history_global';
+        const historyData = localStorage.getItem(storageKey);
+        const history = historyData ? JSON.parse(historyData) : [];
+        
+        // Slice the last 6 turns
+        const recent = history.slice(-6);
+        return recent.map(msg => [msg.role, msg.content]);
+    } catch (err) {
+        console.error('Error fetching chat history for API:', err);
+        return [];
+    }
 }
