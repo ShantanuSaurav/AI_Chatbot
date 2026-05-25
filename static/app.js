@@ -32,6 +32,7 @@ const chatLog = document.getElementById('chatLog');
 const chatForm = document.getElementById('chatForm');
 const chatInput = document.getElementById('chatInput');
 const sendBtn = document.getElementById('sendBtn');
+const openNewTabBtn = document.getElementById('openNewTabBtn');
 
 // Initialize Lucide Icons & App
 document.addEventListener('DOMContentLoaded', () => {
@@ -336,10 +337,18 @@ function setActiveDocument(docId) {
     activeDocTitle.innerText = activeDoc.filename;
     chatScopeBadge.innerText = "Specific Document scope";
 
+    const docFileUrl = `/api/documents/${docId}/file?q_session_id=${sessionId}`;
+
+    // Configure open in new tab button
+    if (openNewTabBtn) {
+        openNewTabBtn.href = docFileUrl;
+        openNewTabBtn.style.display = 'flex';
+    }
+
     // Set side-by-side iframe source (pass session id in query param for GET request verification)
     pdfWelcome.style.display = 'none';
     pdfIframe.style.display = 'block';
-    pdfIframe.src = `/api/documents/${docId}/file?q_session_id=${sessionId}`;
+    pdfIframe.src = docFileUrl;
 
     // Clear chat logs and load historical conversation
     clearChatLog();
@@ -352,6 +361,12 @@ function resetWorkspace() {
     pdfWelcome.style.display = 'flex';
     pdfIframe.style.display = 'none';
     pdfIframe.src = '';
+    
+    if (openNewTabBtn) {
+        openNewTabBtn.href = '';
+        openNewTabBtn.style.display = 'none';
+    }
+    
     clearChatLog();
     loadChatHistory();
 }
