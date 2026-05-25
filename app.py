@@ -93,9 +93,12 @@ def split_text_into_chunks(text: str):
 async def read_index():
     return FileResponse("static/index.html")
 
-# Upload Document Files
+# Upload Document Files (Isolated per session)
 @app.post("/api/upload")
-async def upload_documents(files: List[UploadFile] = File(...)):
+async def upload_documents(
+    files: List[UploadFile] = File(...), 
+    session_id: str = Header(..., alias="Session-ID")
+):
     db = load_db()
     responses = []
 
@@ -123,13 +126,14 @@ async def upload_documents(files: List[UploadFile] = File(...)):
             "id": doc_id,
             "filename": file.filename,
             "size": len(file_bytes),
-            "upload_date": datetime.utcnow().isoformat()
+            "upload_date": datetime.utcnow().isoformat(),
+            "session_id": session_id
         }
         db["documents"].append(doc_entry)
 
         # Chunk and embed into Chroma
         chunks = split_text_into_chunks(text)
-        metadatas = [{"doc_id": doc_id, "filename": file.filename} for _ in chunks]
+        metadatas = [{"doc_id": doc_id, "filename": file.filename, "session_id": session_id} for _ in chunks]
         
         vector_store.add_texts(texts=chunks, metadatas=metadatas)
 
@@ -138,15 +142,33 @@ async def upload_documents(files: List[UploadFile] = File(...)):
     save_db(db)
     return responses
 
-# List Uploaded Documents
+# List Uploaded Documents (Isolated per session)
 @app.get("/api/documents")
-async def list_documents():
+async def list_documents(session_id: str = Header(..., alias="Session-ID")):
     db = load_db()
-    return db["documents"]
+    return [doc for doc in db["documents"] if doc.get("session_id") == session_id]
 
-# Stream PDF File
+# Stream PDF File (Verified for active session security)
 @app.get("/api/documents/{doc_id}/file")
-async def get_document_file(doc_id: str):
+async def get_document_file(
+    doc_id: str, 
+    session_id: Optional[str] = Header(None, alias="Session-ID"),
+    q_session_id: Optional[str] = None
+):
+    active_sid = session_id or q_session_id
+    if not active_sid:
+        raise HTTPException(status_code=400, detail="Missing session verification parameters")
+        
+    db = load_db()
+    doc_owner = False
+    for doc in db["documents"]:
+        if doc["id"] == doc_id and doc.get("session_id") == active_sid:
+            doc_owner = True
+            break
+            
+    if not doc_owner:
+        raise HTTPException(status_code=403, detail="Unauthorized access to document")
+
     file_path = os.path.join("uploads", f"{doc_id}.pdf")
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="PDF file not found")
@@ -156,30 +178,30 @@ async def get_document_file(doc_id: str):
         media_type="application/pdf"
     )
 
-# Delete Document
+# Delete Document (Session isolated cascading wipe)
 @app.delete("/api/documents/{doc_id}")
-async def delete_document(doc_id: str):
+async def delete_document(doc_id: str, session_id: str = Header(..., alias="Session-ID")):
     db = load_db()
     
     # 1. Remove document metadata
     doc_to_delete = None
     for doc in db["documents"]:
-        if doc["id"] == doc_id:
+        if doc["id"] == doc_id and doc.get("session_id") == session_id:
             doc_to_delete = doc
             break
             
     if not doc_to_delete:
-        raise HTTPException(status_code=404, detail="Document not found")
+        raise HTTPException(status_code=404, detail="Document not found or unauthorized")
         
     db["documents"].remove(doc_to_delete)
     
-    # 2. Remove associated chats
-    if doc_id in db["chats"]:
+    # Remove associated chats from db (just in case)
+    if doc_id in db.get("chats", {}):
         del db["chats"][doc_id]
         
     save_db(db)
     
-    # 3. Delete local physical file
+    # 2. Delete local physical file
     file_path = os.path.join("uploads", f"{doc_id}.pdf")
     if os.path.exists(file_path):
         try:
@@ -187,7 +209,7 @@ async def delete_document(doc_id: str):
         except Exception as e:
             print(f"Error removing physical file: {e}")
             
-    # 4. Clean up Chroma vector store
+    # 3. Clean up Chroma vector store
     try:
         vector_store.delete(where={"doc_id": doc_id})
     except Exception as e:
@@ -229,21 +251,19 @@ class CustomHFClientLLM(LLM):
 class ChatRequest(BaseModel):
     message: str
     doc_id: Optional[str] = None
+    chat_history: Optional[List[List[str]]] = None
 
 @app.post("/api/chat")
-async def chat_with_docs(request: ChatRequest):
+async def chat_with_docs(request: ChatRequest, session_id: str = Header(..., alias="Session-ID")):
     db = load_db()
     
-    # Fetch chat session history
-    chat_key = request.doc_id if request.doc_id else "global"
-    if chat_key not in db["chats"]:
-        db["chats"][chat_key] = []
-        
+    # Map and load conversational history provided by the client (stored locally in browser)
     chat_history = []
-    # Grab last 6 turns for conversational context
-    for msg in db["chats"][chat_key][-6:]:
-        role = "human" if msg["role"] == "user" else "ai"
-        chat_history.append((role, msg["content"]))
+    if request.chat_history:
+        for turn in request.chat_history:
+            if len(turn) == 2:
+                role = "human" if turn[0] == "user" else "ai"
+                chat_history.append((role, turn[1]))
 
     # Initialize LLM dynamically based on configured keys
     llm = None
@@ -298,11 +318,17 @@ async def chat_with_docs(request: ChatRequest):
         ("human", "{input}")
     ])
 
-    # Establish Retriever with optional metadata scope filter
+    # Establish Retriever with strict metadata session-isolation filter
     search_kwargs = {"k": 6}
+    filter_dict = {"session_id": session_id}
     if request.doc_id:
-        search_kwargs["filter"] = {"doc_id": request.doc_id}
-        
+        filter_dict = {
+            "$and": [
+                {"doc_id": request.doc_id},
+                {"session_id": session_id}
+            ]
+        }
+    search_kwargs["filter"] = filter_dict
     retriever = vector_store.as_retriever(search_kwargs=search_kwargs)
 
     try:
@@ -326,22 +352,62 @@ async def chat_with_docs(request: ChatRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"RAG query execution error: {str(e)}")
 
-    # Save turn to local json chat database
-    timestamp = datetime.utcnow().isoformat()
-    db["chats"][chat_key].append({"role": "user", "content": request.message, "timestamp": timestamp})
-    db["chats"][chat_key].append({"role": "ai", "content": answer, "sources": sources, "timestamp": timestamp})
-    save_db(db)
-
+    # We do NOT save chat logs to the server's db.json (ensures complete privacy)
     return {"answer": answer, "sources": sources}
 
-# Get Chat History
-@app.get("/api/chat/history")
-async def get_chat_history(doc_id: Optional[str] = None):
+# Session Cleanup Endpoint (Triggered when user closes browser tab or window)
+@app.post("/api/session/clear")
+async def clear_session(
+    session_id: Optional[str] = Header(None, alias="Session-ID"),
+    q_session_id: Optional[str] = None
+):
+    active_sid = session_id or q_session_id
+    if not active_sid:
+        raise HTTPException(status_code=400, detail="Missing Session-ID verification")
+        
     db = load_db()
-    chat_key = doc_id if doc_id else "global"
-    if chat_key in db["chats"]:
-        return db["chats"][chat_key]
-    return []
+    
+    # 1. Collect all documents belonging to this session
+    docs_to_delete = [doc for doc in db["documents"] if doc.get("session_id") == active_sid]
+    
+    if not docs_to_delete:
+        return {"message": "Session already clean or no documents found", "deleted_count": 0}
+        
+    deleted_count = 0
+    for doc in docs_to_delete:
+        doc_id = doc["id"]
+        
+        # A. Remove from db metadata
+        db["documents"].remove(doc)
+        
+        # B. Delete physical file
+        file_path = os.path.join("uploads", f"{doc_id}.pdf")
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except Exception as e:
+                print(f"Cleanup error removing physical file {doc_id}: {e}")
+                
+        # C. Delete from Chroma
+        try:
+            vector_store.delete(where={"doc_id": doc_id})
+        except Exception as e:
+            print(f"Cleanup error removing {doc_id} from Chroma: {e}")
+            
+        deleted_count += 1
+        
+    save_db(db)
+    
+    # D. Wipe session's vector store index in one shot just in case
+    try:
+        vector_store.delete(where={"session_id": active_sid})
+    except Exception as e:
+         print(f"Wipe session {active_sid} fallback error: {e}")
+         
+    return {
+        "message": "Wiped all session resources successfully", 
+        "deleted_count": deleted_count
+    }
 
 if __name__ == "__main__":
     import uvicorn
