@@ -174,7 +174,7 @@ async function handleUploadSubmit(e) {
     });
 
     try {
-        const res = await fetch('/api/upload', {
+        const res = await fetch(`/api/upload?q_session_id=${sessionId}`, {
             method: 'POST',
             headers: { 'Session-ID': sessionId },
             body: formData
@@ -182,7 +182,15 @@ async function handleUploadSubmit(e) {
 
         if (!res.ok) {
             const data = await res.json();
-            throw new Error(data.detail || 'Upload failed');
+            let errMsg = 'Upload failed';
+            if (data && data.detail) {
+                if (Array.isArray(data.detail)) {
+                    errMsg = data.detail.map(d => `${d.loc.join('.')}: ${d.msg}`).join(', ');
+                } else {
+                    errMsg = data.detail;
+                }
+            }
+            throw new Error(errMsg);
         }
 
         selectedFiles = [];
@@ -202,7 +210,7 @@ async function handleUploadSubmit(e) {
 // Fetch Document List from API
 async function fetchDocuments() {
     try {
-        const res = await fetch('/api/documents', {
+        const res = await fetch(`/api/documents?q_session_id=${sessionId}`, {
             headers: { 'Session-ID': sessionId }
         });
         if (!res.ok) throw new Error('Failed to load documents');
@@ -293,7 +301,7 @@ function toggleDeleteConfirm(e, docId) {
 async function confirmDelete(e, docId) {
     e.stopPropagation();
     try {
-        const res = await fetch(`/api/documents/${docId}`, { 
+        const res = await fetch(`/api/documents/${docId}?q_session_id=${sessionId}`, { 
             method: 'DELETE',
             headers: { 'Session-ID': sessionId }
         });
@@ -490,11 +498,12 @@ async function handleChatSubmit(e) {
     try {
         const payload = { 
             message: query,
-            chat_history: getRecentChatHistoryForAPI()
+            chat_history: getRecentChatHistoryForAPI(),
+            session_id: sessionId
         };
         if (activeDocId) payload.doc_id = activeDocId;
 
-        const res = await fetch('/api/chat', {
+        const res = await fetch(`/api/chat?q_session_id=${sessionId}`, {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
