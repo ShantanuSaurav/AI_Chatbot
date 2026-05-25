@@ -97,8 +97,13 @@ async def read_index():
 @app.post("/api/upload")
 async def upload_documents(
     files: List[UploadFile] = File(...), 
-    session_id: str = Header(..., alias="Session-ID")
+    session_id: Optional[str] = Header(None, alias="Session-ID"),
+    q_session_id: Optional[str] = None
 ):
+    active_sid = session_id or q_session_id
+    if not active_sid:
+        raise HTTPException(status_code=400, detail="Missing session verification parameters")
+        
     db = load_db()
     responses = []
 
@@ -127,13 +132,13 @@ async def upload_documents(
             "filename": file.filename,
             "size": len(file_bytes),
             "upload_date": datetime.utcnow().isoformat(),
-            "session_id": session_id
+            "session_id": active_sid
         }
         db["documents"].append(doc_entry)
 
         # Chunk and embed into Chroma
         chunks = split_text_into_chunks(text)
-        metadatas = [{"doc_id": doc_id, "filename": file.filename, "session_id": session_id} for _ in chunks]
+        metadatas = [{"doc_id": doc_id, "filename": file.filename, "session_id": active_sid} for _ in chunks]
         
         vector_store.add_texts(texts=chunks, metadatas=metadatas)
 
@@ -144,9 +149,16 @@ async def upload_documents(
 
 # List Uploaded Documents (Isolated per session)
 @app.get("/api/documents")
-async def list_documents(session_id: str = Header(..., alias="Session-ID")):
+async def list_documents(
+    session_id: Optional[str] = Header(None, alias="Session-ID"),
+    q_session_id: Optional[str] = None
+):
+    active_sid = session_id or q_session_id
+    if not active_sid:
+        raise HTTPException(status_code=400, detail="Missing session verification parameters")
+        
     db = load_db()
-    return [doc for doc in db["documents"] if doc.get("session_id") == session_id]
+    return [doc for doc in db["documents"] if doc.get("session_id") == active_sid]
 
 # Stream PDF File (Verified for active session security)
 @app.get("/api/documents/{doc_id}/file")
@@ -180,13 +192,21 @@ async def get_document_file(
 
 # Delete Document (Session isolated cascading wipe)
 @app.delete("/api/documents/{doc_id}")
-async def delete_document(doc_id: str, session_id: str = Header(..., alias="Session-ID")):
+async def delete_document(
+    doc_id: str, 
+    session_id: Optional[str] = Header(None, alias="Session-ID"),
+    q_session_id: Optional[str] = None
+):
+    active_sid = session_id or q_session_id
+    if not active_sid:
+        raise HTTPException(status_code=400, detail="Missing session verification parameters")
+        
     db = load_db()
     
     # 1. Remove document metadata
     doc_to_delete = None
     for doc in db["documents"]:
-        if doc["id"] == doc_id and doc.get("session_id") == session_id:
+        if doc["id"] == doc_id and doc.get("session_id") == active_sid:
             doc_to_delete = doc
             break
             
@@ -252,9 +272,18 @@ class ChatRequest(BaseModel):
     message: str
     doc_id: Optional[str] = None
     chat_history: Optional[List[List[str]]] = None
+    session_id: Optional[str] = None
 
 @app.post("/api/chat")
-async def chat_with_docs(request: ChatRequest, session_id: str = Header(..., alias="Session-ID")):
+async def chat_with_docs(
+    request: ChatRequest, 
+    session_id: Optional[str] = Header(None, alias="Session-ID"),
+    q_session_id: Optional[str] = None
+):
+    active_sid = session_id or q_session_id or request.session_id
+    if not active_sid:
+        raise HTTPException(status_code=400, detail="Missing Session-ID verification")
+        
     db = load_db()
     
     # Map and load conversational history provided by the client (stored locally in browser)
@@ -320,12 +349,12 @@ async def chat_with_docs(request: ChatRequest, session_id: str = Header(..., ali
 
     # Establish Retriever with strict metadata session-isolation filter
     search_kwargs = {"k": 6}
-    filter_dict = {"session_id": session_id}
+    filter_dict = {"session_id": active_sid}
     if request.doc_id:
         filter_dict = {
             "$and": [
                 {"doc_id": request.doc_id},
-                {"session_id": session_id}
+                {"session_id": active_sid}
             ]
         }
     search_kwargs["filter"] = filter_dict
