@@ -294,7 +294,7 @@ async def chat_with_docs(
         try:
             # Initialize Google GenAI Chat Model
             llm = ChatGoogleGenerativeAI(
-                model="gemini-1.5-pro",
+                model="gemini-2.5-pro",
                 temperature=0,
                 google_api_key=GEMINI_API_KEY
             )
