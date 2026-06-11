@@ -26,7 +26,7 @@ const docCountBadge = document.getElementById('docCountBadge');
 const docList = document.getElementById('docList');
 const activeDocTitle = document.getElementById('activeDocTitle');
 const pdfWelcome = document.getElementById('pdfWelcome');
-const pdfIframe = document.getElementById('pdfIframe');
+const pdfCanvasContainer = document.getElementById('pdfCanvasContainer');
 const chatScopeBadge = document.getElementById('chatScopeBadge');
 const chatLog = document.getElementById('chatLog');
 const chatForm = document.getElementById('chatForm');
@@ -344,22 +344,67 @@ function setActiveDocument(docId) {
         openNewTabBtn.style.display = 'flex';
     }
 
-    // Set side-by-side iframe source (pass session id in query param for GET request verification)
+    // Render PDF natively with PDF.js
     pdfWelcome.style.display = 'none';
-    pdfIframe.style.display = 'block';
-    pdfIframe.src = docFileUrl;
+    pdfCanvasContainer.style.display = 'block';
+    renderPDF(docFileUrl);
 
     // Clear chat logs
     clearChatLog();
     renderChatWelcome();
 }
 
+async function renderPDF(url) {
+    pdfCanvasContainer.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-muted);"><i data-lucide="loader-2" class="animate-pulse" style="animation: spin 1.5s linear infinite; width: 32px; height: 32px;"></i><p style="margin-top: 1rem;">Rendering PDF natively...</p></div>';
+    lucide.createIcons();
+    
+    try {
+        const loadingTask = pdfjsLib.getDocument({
+            url: url,
+            httpHeaders: { 'Session-ID': sessionId }
+        });
+        const pdf = await loadingTask.promise;
+        
+        pdfCanvasContainer.innerHTML = ''; // clear loading state
+        
+        // Render all pages sequentially
+        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+            const page = await pdf.getPage(pageNum);
+            const viewport = page.getViewport({ scale: 1.5 }); // Adjust scale for clarity
+            
+            const canvasWrapper = document.createElement('div');
+            canvasWrapper.className = 'pdf-page-wrapper';
+            canvasWrapper.style.marginBottom = '16px';
+            canvasWrapper.style.backgroundColor = '#ffffff';
+            canvasWrapper.style.boxShadow = '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)';
+            
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+            canvas.style.display = 'block';
+            canvas.style.maxWidth = '100%';
+            canvas.style.height = 'auto';
+            canvas.style.margin = '0 auto';
+            
+            canvasWrapper.appendChild(canvas);
+            pdfCanvasContainer.appendChild(canvasWrapper);
+            
+            await page.render({ canvasContext: context, viewport: viewport }).promise;
+        }
+    } catch (error) {
+        console.error('Error rendering PDF:', error);
+        pdfCanvasContainer.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--danger);"><i data-lucide="alert-triangle" style="width: 32px; height: 32px;"></i><p style="margin-top: 1rem;">Failed to render PDF preview.</p></div>';
+        lucide.createIcons();
+    }
+}
+
 function resetWorkspace() {
     activeDocTitle.innerText = "Select a Document";
     chatScopeBadge.innerText = "Global Scope";
     pdfWelcome.style.display = 'flex';
-    pdfIframe.style.display = 'none';
-    pdfIframe.src = '';
+    pdfCanvasContainer.style.display = 'none';
+    pdfCanvasContainer.innerHTML = '';
     
     if (openNewTabBtn) {
         openNewTabBtn.href = '';
