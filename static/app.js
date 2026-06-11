@@ -500,7 +500,14 @@ async function handleChatSubmit(e) {
             body: JSON.stringify(payload)
         });
 
-        if (!res.ok) throw new Error('API communication failure');
+        if (!res.ok) {
+            let errorMsg = 'API communication failure';
+            try {
+                const errData = await res.json();
+                if (errData.detail) errorMsg = errData.detail;
+            } catch (e) {}
+            throw new Error(errorMsg);
+        }
         const reply = await res.json();
         
         // Remove typing indicator loader
