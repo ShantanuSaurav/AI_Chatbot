@@ -4,7 +4,6 @@ python-multipart
 chromadb
 langchain>=0.3.0
 langchain-community>=0.3.0
-langchain-classic
 langchain-huggingface
 sentence-transformers
 google-generativeai
