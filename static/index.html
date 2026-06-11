@@ -13,10 +13,6 @@
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
     
-    <!-- PDF.js for rendering PDFs natively in sandboxed iframes -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
-
     <!-- Stylesheet -->
     <link rel="stylesheet" href="/static/style.css">
 </head>
@@ -111,7 +107,7 @@
                         <h3>Global Query Mode Active</h3>
                         <p>You are currently questioning across <strong>all uploaded documents</strong>. Select any PDF in the sidebar to open the interactive side-by-side reader.</p>
                     </div>
-                    <div id="pdfCanvasContainer" class="pdf-canvas-container" style="display: none;"></div>
+                    <iframe id="pdfIframe" class="pdf-iframe" style="display: none;"></iframe>
                 </div>
             </section>
 
