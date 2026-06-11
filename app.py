@@ -12,8 +12,8 @@ from dotenv import load_dotenv
 
 # LangChain, Chroma & Gemini imports
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_classic.chains import create_retrieval_chain
-from langchain_classic.chains.combine_documents import create_stuff_documents_chain
+from langchain.chains import create_retrieval_chain
+from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_community.vectorstores import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -271,7 +271,6 @@ class CustomHFClientLLM(LLM):
 class ChatRequest(BaseModel):
     message: str
     doc_id: Optional[str] = None
-    chat_history: Optional[List[List[str]]] = None
     session_id: Optional[str] = None
 
 @app.post("/api/chat")
@@ -286,13 +285,8 @@ async def chat_with_docs(
         
     db = load_db()
     
-    # Map and load conversational history provided by the client (stored locally in browser)
+    # History tracking is disabled to maintain strict document bounding
     chat_history = []
-    if request.chat_history:
-        for turn in request.chat_history:
-            if len(turn) == 2:
-                role = "human" if turn[0] == "user" else "ai"
-                chat_history.append((role, turn[1]))
 
     # Initialize LLM dynamically based on configured keys
     llm = None
@@ -327,9 +321,10 @@ async def chat_with_docs(
     system_prompt = (
         "You are a strict document-bound AI assistant. Your sole purpose is to answer the user's question using ONLY the provided retrieved context blocks.\n"
         "CRITICAL RULES FOR SOURCE INTEGRITY:\n"
-        "1. Answer the question based strictly on the provided Context. Do NOT use any external knowledge, outside facts, assumptions, or extrapolations.\n"
-        "2. If the answer cannot be found in the Context, or if the Context is insufficient, state clearly: 'I am sorry, but the uploaded documents do not contain information to answer this question.' Do not attempt to answer or hallucinate.\n"
-        "3. Every fact or statement in your response must be explicitly supported by the Context.\n\n"
+        "1. Answer the question based strictly on the provided Context. Do NOT use any external knowledge, outside facts, assumptions, or your pre-trained knowledge base.\n"
+        "2. If the answer cannot be found in the Context, or if the Context is insufficient, state clearly: 'I am sorry, but the uploaded documents do not contain information to answer this question.' Do not attempt to guess or hallucinate.\n"
+        "3. Every fact or statement in your response must be explicitly supported by the Context.\n"
+        "4. You may adjust your tone, reading level, or formatting (e.g., simpler explanation, tabular format) IF explicitly requested by the user, but you must still strictly adhere to facts found in the Context ONLY.\n\n"
         "CRITICAL RULES FOR MATHEMATICAL CALCULATIONS AND FORMULAS:\n"
         "1. Calculations, formulas, and math expressions must be written in standard publication-quality LaTeX math notation so they render perfectly as general mathematical forms (comparable to clean handwritten or textbook style).\n"
         "2. DO NOT use raw text symbols like '*' or '\\times' for multiplication. Always use '\\cdot' (centered dot) to represent multiplication (e.g. use 'a \\cdot b' instead of 'a * b' or 'a \\times b').\n"
@@ -343,7 +338,6 @@ async def chat_with_docs(
     )
     prompt_template = ChatPromptTemplate.from_messages([
         ("system", system_prompt),
-        MessagesPlaceholder("chat_history"),
         ("human", "{input}")
     ])
 
@@ -366,8 +360,7 @@ async def chat_with_docs(
         rag_chain = create_retrieval_chain(retriever, question_answer_chain)
         
         response = rag_chain.invoke({
-            "input": request.message,
-            "chat_history": chat_history
+            "input": request.message
         })
         
         answer = response["answer"]

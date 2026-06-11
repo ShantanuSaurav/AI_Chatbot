@@ -315,8 +315,7 @@ async function confirmDelete(e, docId) {
         }
         await fetchDocuments();
         
-        // Remove locally stored chat history for deleted document
-        localStorage.removeItem(`chat_history_${docId}`);
+        // Document deleted
     } catch (err) {
         console.error(err);
         alert('Delete failed: ' + err.message);
@@ -350,9 +349,9 @@ function setActiveDocument(docId) {
     pdfIframe.style.display = 'block';
     pdfIframe.src = docFileUrl;
 
-    // Clear chat logs and load historical conversation
+    // Clear chat logs
     clearChatLog();
-    loadChatHistory();
+    renderChatWelcome();
 }
 
 function resetWorkspace() {
@@ -368,34 +367,11 @@ function resetWorkspace() {
     }
     
     clearChatLog();
-    loadChatHistory();
+    renderChatWelcome();
 }
 
 function clearChatLog() {
     chatLog.innerHTML = '';
-}
-
-// Load Chat History from Local Storage (Scoped by active context)
-function loadChatHistory() {
-    try {
-        const storageKey = activeDocId ? `chat_history_${activeDocId}` : 'chat_history_global';
-        const historyData = localStorage.getItem(storageKey);
-        const history = historyData ? JSON.parse(historyData) : [];
-        
-        if (history.length === 0) {
-            renderChatWelcome();
-            return;
-        }
-
-        history.forEach(msg => {
-            appendMessageBubble(msg.role, msg.content, msg.sources);
-        });
-        
-        scrollChatToBottom();
-    } catch (err) {
-        console.error('Error loading chat history from local storage:', err);
-        renderChatWelcome();
-    }
 }
 
 function renderChatWelcome() {
@@ -487,9 +463,6 @@ async function handleChatSubmit(e) {
     appendMessageBubble('user', query);
     scrollChatToBottom();
 
-    // Save user message in local history
-    saveToLocalHistory('user', query);
-
     // Setup Typing indicator
     const loaderRow = document.createElement('div');
     loaderRow.className = 'msg-row ai animate-pulse';
@@ -513,7 +486,6 @@ async function handleChatSubmit(e) {
     try {
         const payload = { 
             message: query,
-            chat_history: getRecentChatHistoryForAPI(),
             session_id: sessionId
         };
         if (activeDocId) payload.doc_id = activeDocId;
@@ -535,9 +507,6 @@ async function handleChatSubmit(e) {
         if (loader) loader.remove();
 
         appendMessageBubble('ai', reply.answer, reply.sources);
-        
-        // Save AI message in local history
-        saveToLocalHistory('ai', reply.answer, reply.sources);
         
         scrollChatToBottom();
     } catch (err) {
@@ -627,42 +596,4 @@ function parseSimpleMarkdown(text) {
     return result;
 }
 
-// Local Chat History Helpers (Ensures 100% server privacy, scoped by context)
-function saveToLocalHistory(role, content, sources = null) {
-    try {
-        const storageKey = activeDocId ? `chat_history_${activeDocId}` : 'chat_history_global';
-        const historyData = localStorage.getItem(storageKey);
-        const history = historyData ? JSON.parse(historyData) : [];
-        
-        history.push({
-            role,
-            content,
-            sources,
-            timestamp: new Date().toISOString()
-        });
-        
-        // Retain only last 50 entries to maintain crisp local storage sizes
-        if (history.length > 50) {
-            history.shift();
-        }
-        
-        localStorage.setItem(storageKey, JSON.stringify(history));
-    } catch (err) {
-        console.error('Error saving chat history locally:', err);
-    }
-}
-
-function getRecentChatHistoryForAPI() {
-    try {
-        const storageKey = activeDocId ? `chat_history_${activeDocId}` : 'chat_history_global';
-        const historyData = localStorage.getItem(storageKey);
-        const history = historyData ? JSON.parse(historyData) : [];
-        
-        // Slice the last 6 turns
-        const recent = history.slice(-6);
-        return recent.map(msg => [msg.role, msg.content]);
-    } catch (err) {
-        console.error('Error fetching chat history for API:', err);
-        return [];
-    }
-}
+// Local Chat History Helpers Removed
