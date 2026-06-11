@@ -515,7 +515,7 @@ async function handleChatSubmit(e) {
         const loader = document.getElementById('chatTypingLoader');
         if (loader) loader.remove();
         
-        appendMessageBubble('ai', "I encountered an error trying to process that question. Please make sure that EITHER your Google Gemini API Key OR your free Hugging Face API Token is configured in `backend/.env`.");
+        appendMessageBubble('ai', "Error: " + err.message);
         scrollChatToBottom();
     } finally {
         chatting = false;
