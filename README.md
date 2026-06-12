@@ -1,13 +1,3 @@
----
-title: PDF Copilot Chatbot
-emoji: 📄
-colorFrom: green
-colorTo: blue
-sdk: docker
-pinned: false
-license: mit
----
-
 # PDF Copilot - Intelligent RAG Document Chatbot
 
 PDF Copilot is a powerful Retrieval-Augmented Generation (RAG) chatbot that allows users to seamlessly upload PDF documents and ask questions across them. It uses advanced machine learning models to extract paragraphs relevant to your questions and synthesizes natural language answers.
