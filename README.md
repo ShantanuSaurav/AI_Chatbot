@@ -1,14 +1,3 @@
----
-title: PDF Copilot Chatbot
-emoji: 📄
-colorFrom: green
-colorTo: blue
-sdk: docker
-pinned: false
-license: mit
-app_file: app.py
----
-
 # PDF Copilot - Intelligent RAG Document Chatbot
 
 [![Hugging Face Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-blue)](https://huggingface.co/spaces/HYPERx54/PDF-Chatbot)
@@ -17,7 +6,7 @@ PDF Copilot is a powerful Retrieval-Augmented Generation (RAG) chatbot that allo
 
 **Try it out live here:** [https://huggingface.co/spaces/HYPERx54/PDF-Chatbot](https://huggingface.co/spaces/HYPERx54/PDF-Chatbot)
 
-## 🚀 Features
+##  Features
 
 - **Multi-Document Support:** Upload multiple PDFs and maintain an organized document library in the sidebar.
 - **Global & Specific Scope:**
@@ -27,7 +16,7 @@ PDF Copilot is a powerful Retrieval-Augmented Generation (RAG) chatbot that allo
 - **Beautiful Mathematical Rendering:** Fully supports and elegantly renders complex mathematical formulas, equations, and expressions using KaTeX.
 - **Session Privacy:** Uploads and chat logs are completely isolated per session. When you close the browser tab, a cleanup beacon securely wipes your temporary files and vector embeddings.
 
-## 🛠️ Technology Stack
+##  Technology Stack
 
 - **Backend Framework:** FastAPI
 - **LLM AI Provider:** Google Gemini (Gemini 2.5 Flash) via `langchain-google-genai`
@@ -35,7 +24,7 @@ PDF Copilot is a powerful Retrieval-Augmented Generation (RAG) chatbot that allo
 - **Vector Database:** ChromaDB
 - **Frontend UI:** Vanilla JavaScript, HTML, CSS with Lucide Icons and PDF.js
 
-## 💻 Local Installation
+##  Local Installation
 
 To run this project locally on your machine:
 
@@ -82,13 +71,13 @@ This application is fully compatible with Hugging Face Spaces using the Docker S
 4. Create a new Secret named `GEMINI_API_KEY` and paste your Google Gemini API key.
 5. The Space will automatically build and securely inject the keys into the application.
 
-## ⚠️ Current Limitations (Cons)
+##  Current Limitations (Cons)
 
 - **Vector Database Reset:** The current implementation uses an ephemeral/local ChromaDB storage approach. When the server fully shuts down or restarts, previous document embeddings may be lost and require re-uploading.
 - **Large PDF Processing Time:** Very large PDFs (e.g., 100+ pages) might take slightly longer to chunk and embed upon the initial upload since embedding happens synchronously on the CPU.
 - **Context Window Limitations:** While the Global Search increases retrieval depth, extremely complex cross-document reasoning might still miss highly fragmented information if it falls outside the top 25 retrieved chunks.
 - **Stateless AI Memory:** To strictly ensure answers are bound to the document context, the chatbot does not retain conversational memory (chat history context) between different questions. Each question is treated independently against the document.
 
-## 📜 License
+##  License
 
 This project is licensed under the MIT License.
