@@ -60,6 +60,13 @@ This application is fully compatible with Hugging Face Spaces using the Docker S
 4. Create a new Secret named \GEMINI_API_KEY\ and paste your Google Gemini API key.
 5. The Space will automatically build and securely inject the keys into the application.
 
+## ⚠️ Current Limitations (Cons)
+
+- **Vector Database Reset:** The current implementation uses an ephemeral/local ChromaDB storage approach. When the server fully shuts down or restarts, previous document embeddings may be lost and require re-uploading.
+- **Large PDF Processing Time:** Very large PDFs (e.g., 100+ pages) might take slightly longer to chunk and embed upon the initial upload since embedding happens synchronously on the CPU.
+- **Context Window Limitations:** While the Global Search increases retrieval depth, extremely complex cross-document reasoning might still miss highly fragmented information if it falls outside the top 25 retrieved chunks.
+- **Stateless AI Memory:** To strictly ensure answers are bound to the document context, the chatbot does not retain conversational memory (chat history context) between different questions. Each question is treated independently against the document.
+
 ## 📜 License
 
 This project is licensed under the MIT License.
