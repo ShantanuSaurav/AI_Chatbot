@@ -290,22 +290,28 @@ async def chat_with_docs(
 
     # Initialize LLM dynamically based on configured keys
     llm = None
-    if GEMINI_API_KEY and GEMINI_API_KEY != "your_gemini_api_key_here":
+    
+    # Dynamically fetch latest keys (handles cases where HF secrets are loaded after module initialization)
+    gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    hf_token = os.environ.get("HF_TOKEN", "").strip()
+    hf_model_id = os.environ.get("HF_MODEL_ID", "Qwen/Qwen2.5-72B-Instruct").strip()
+
+    if gemini_key and gemini_key != "your_gemini_api_key_here":
         try:
             # Initialize Google GenAI Chat Model
             llm = ChatGoogleGenerativeAI(
-                model="gemini-2.5-pro",
+                model="gemini-2.5-flash",
                 temperature=0,
-                google_api_key=GEMINI_API_KEY
+                google_api_key=gemini_key
             )
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Google LLM init error: {str(e)}")
-    elif HF_TOKEN and HF_TOKEN != "your_huggingface_token_here":
+    elif hf_token and hf_token != "your_huggingface_token_here":
         try:
             # Initialize Custom HuggingFace Serverless Inference Endpoint
             llm = CustomHFClientLLM(
-                model_id=HF_MODEL_ID,
-                token=HF_TOKEN,
+                model_id=hf_model_id,
+                token=hf_token,
                 temperature=0.1,
                 max_tokens=512
             )
@@ -342,8 +348,7 @@ async def chat_with_docs(
     ])
 
     # Establish Retriever with strict metadata session-isolation filter
-    search_kwargs = {"k": 6}
-    filter_dict = {"session_id": active_sid}
+    search_kwargs = {}
     if request.doc_id:
         filter_dict = {
             "$and": [
@@ -351,7 +356,13 @@ async def chat_with_docs(
                 {"session_id": active_sid}
             ]
         }
-    search_kwargs["filter"] = filter_dict
+        search_kwargs["filter"] = filter_dict
+        search_kwargs["k"] = 8  # Sufficient for a single document
+    else:
+        filter_dict = {"session_id": active_sid}
+        search_kwargs["filter"] = filter_dict
+        search_kwargs["k"] = 25  # Retrieve much broader context for Global Search across multiple files
+
     retriever = vector_store.as_retriever(search_kwargs=search_kwargs)
 
     try:

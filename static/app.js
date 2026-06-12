@@ -350,12 +350,17 @@ function setActiveDocument(docId) {
     // Use the official viewer UI (zoom, scroll, search, copy text)
     pdfIframe.src = `/static/pdfjs/web/viewer.html?file=${encodeURIComponent(docFileUrl)}`;
 
-    // Clear chat logs
-    clearChatLog();
-    renderChatWelcome();
+    // Update welcome message only if chat is empty, preserving history
+    const hasChats = chatLog.querySelector('.msg-row');
+    if (!hasChats) {
+        renderChatWelcome();
+    }
 }
 
 function resetWorkspace() {
+    activeDocId = null;
+    renderDocumentList(); // Update sidebar active state
+    
     activeDocTitle.innerText = "Select a Document";
     chatScopeBadge.innerText = "Global Scope";
     pdfWelcome.style.display = 'flex';
@@ -367,8 +372,11 @@ function resetWorkspace() {
         openNewTabBtn.style.display = 'none';
     }
     
-    clearChatLog();
-    renderChatWelcome();
+    // Update welcome message only if chat is empty, preserving history
+    const hasChats = chatLog.querySelector('.msg-row');
+    if (!hasChats) {
+        renderChatWelcome();
+    }
 }
 
 function clearChatLog() {
