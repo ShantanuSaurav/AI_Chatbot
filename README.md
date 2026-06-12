@@ -62,7 +62,7 @@ To run this project locally on your machine:
    ```
    The app will start on `http://127.0.0.1:8000`.
 
-## ☁️ Hugging Face Space Deployment
+##  Hugging Face Space Deployment
 
 This application is fully compatible with Hugging Face Spaces using the Docker SDK. To deploy it:
 1. Create a new Space on Hugging Face (SDK: Docker).
