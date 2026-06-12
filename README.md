@@ -11,7 +11,11 @@ app_file: app.py
 
 # PDF Copilot - Intelligent RAG Document Chatbot
 
+[![Hugging Face Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-blue)](https://huggingface.co/spaces/HYPERx54/PDF-Chatbot)
+
 PDF Copilot is a powerful Retrieval-Augmented Generation (RAG) chatbot that allows users to seamlessly upload PDF documents and ask questions across them. It uses advanced machine learning models to extract paragraphs relevant to your questions and synthesizes natural language answers.
+
+**Try it out live here:** [https://huggingface.co/spaces/HYPERx54/PDF-Chatbot](https://huggingface.co/spaces/HYPERx54/PDF-Chatbot)
 
 ## 🚀 Features
 
